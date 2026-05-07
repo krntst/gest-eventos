@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCRB Eventos</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            background: "#faf9fd",
+            primary: "#000a22",
+            "primary-container": "#00204d",
+            "on-primary": "#ffffff",
+            "on-surface": "#1a1b1f",
+            "on-surface-variant": "#44474f",
+            "surface-container": "#efedf2",
+            "surface-container-low": "#f4f3f7",
+            "surface-container-lowest": "#ffffff",
+            "outline-variant": "#c4c6d0",
+            status: {
+              success: "#10B981",
+              warning: "#F59E0B",
+              danger: "#EF4444",
+              info: "#3B82F6"
+            }
+          },
+          fontFamily: {
+            sans: ["Inter", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden bg-background font-sans text-on-surface">
+  <div id="localModeWarning" class="hidden border-b border-amber-300 bg-amber-50 px-6 py-3 text-sm text-amber-900">
+    Este protótipo precisa ser aberto pelo servidor local para salvar no banco SQLite.
+    Use <strong>http://127.0.0.1:4173/</strong>.
+  </div>
+  <div class="flex h-full">
+    <aside class="flex h-full w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest">
+      <div class="flex h-16 items-center gap-2 border-b border-outline-variant px-6 text-xl font-bold text-primary">
+        <span class="material-symbols-outlined">account_balance</span>
+        FCRB Eventos
+      </div>
+
+      <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <a class="flex items-center gap-3 rounded-md bg-primary-container px-3 py-2 text-sm font-medium text-white" href="#">
+          <span class="material-symbols-outlined">dashboard</span>
+          Painel
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">event</span>
+          Eventos
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">task_alt</span>
+          Tarefas
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">campaign</span>
+          Comunicação
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">group</span>
+          Convidados
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">local_shipping</span>
+          Fornecedores
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">description</span>
+          Documentos
+        </a>
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">history</span>
+          Histórico
+        </a>
+      </nav>
+
+      <div class="border-t border-outline-variant p-4">
+        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+          <span class="material-symbols-outlined">settings</span>
+          Configurações
+        </a>
+        <div class="mt-4 flex items-center gap-3 px-3">
+          <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">AS</div>
+          <div>
+            <p class="text-sm font-medium">Ana Silva</p>
+            <p class="text-xs text-on-surface-variant">Gestora de Eventos</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="flex min-w-0 flex-1 flex-col">
+      <header class="shrink-0 border-b border-outline-variant bg-surface-container-lowest">
+        <div class="flex items-center justify-between px-6 py-4">
+          <h1 id="pageTitle" class="text-2xl font-bold text-primary">Painel de Eventos</h1>
+          <button id="openEventModal" class="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-container">
+            <span class="material-symbols-outlined text-base">add</span>
+            Novo evento
+          </button>
+        </div>
+
+        <div id="filtersBar" class="flex flex-wrap items-center gap-3 px-6 pb-4">
+          <div class="relative max-w-md flex-grow">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-xl text-on-surface-variant">search</span>
+            <input class="w-full rounded-md border border-outline-variant bg-white py-2 pl-10 pr-4 text-sm" placeholder="Buscar eventos..." type="text" />
+          </div>
+          <select class="rounded-md border border-outline-variant bg-white py-2 pl-3 pr-8 text-sm">
+            <option>Status</option>
+            <option>Em planejamento</option>
+            <option>Em andamento</option>
+            <option>Encerrado</option>
+          </select>
+          <select class="rounded-md border border-outline-variant bg-white py-2 pl-3 pr-8 text-sm">
+            <option>Data</option>
+            <option>Hoje</option>
+            <option>Esta semana</option>
+            <option>Este mês</option>
+          </select>
+          <select class="rounded-md border border-outline-variant bg-white py-2 pl-3 pr-8 text-sm">
+            <option>Área</option>
+            <option>Centro de Pesquisa</option>
+            <option>Diretoria de Difusão Cultural</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-6">
+        <div id="dashboardView">
+        <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Eventos cadastrados</p>
+            <p id="totalEvents" class="mt-1 text-xl font-bold text-primary">3</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Próximos em andamento</p>
+            <p class="mt-1 text-xl font-bold text-status-info">12</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Pendências em atraso</p>
+            <p class="mt-1 text-xl font-bold text-status-danger">8</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Comunicação pendente</p>
+            <p class="mt-1 text-xl font-bold text-status-warning">5</p>
+          </div>
+          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Eventos encerrados</p>
+            <p class="mt-1 text-xl font-bold text-status-success">128</p>
+          </div>
+        </section>
+
+        <section id="eventsGrid" class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3"></section>
+        </div>
+
+        <section id="eventDetailView" class="hidden"></section>
+      </div>
+    </main>
+  </div>
+
+  <div id="eventModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-primary/40 p-4">
+    <div class="flex max-h-[92vh] w-full max-w-3xl flex-col border border-outline-variant bg-background shadow-xl">
+      <div class="flex items-start justify-between border-b border-outline-variant bg-white px-6 py-4">
+        <div>
+          <h2 id="eventModalTitle" class="text-xl font-semibold">Novo evento</h2>
+          <p id="eventModalDescription" class="mt-1 text-sm text-on-surface-variant">Preencha os dados básicos para registrar um novo evento na FCRB.</p>
+        </div>
+        <button id="closeEventModal" class="text-on-surface-variant hover:text-on-surface" type="button">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form id="newEventForm" class="flex-1 overflow-y-auto p-6">
+        <div class="space-y-8">
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-medium">1. Identificação</h3>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Nome do evento</span>
+              <input name="eventName" required class="w-full border-outline-variant" placeholder="Ex: Seminário de Literatura Brasileira" type="text" />
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Tipo de evento</span>
+              <select name="eventType" required class="w-full border-outline-variant">
+                <option value="">Selecione o tipo...</option>
+                <option>Seminário</option>
+                <option>Palestra</option>
+                <option>Workshop</option>
+                <option>Exposição</option>
+                <option>Lançamento</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Descrição curta</span>
+              <textarea name="eventDescription" class="w-full resize-none border-outline-variant" placeholder="Breve resumo sobre o propósito do evento." rows="3"></textarea>
+            </label>
+          </section>
+
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-medium">2. Data e formato</h3>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Data de início</span>
+                <input name="startDate" required class="w-full border-outline-variant" type="date" />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Data de término</span>
+                <input name="endDate" class="w-full border-outline-variant" type="date" />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Horário de início</span>
+                <input name="startTime" class="w-full border-outline-variant" type="time" />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Horário de término</span>
+                <input name="endTime" class="w-full border-outline-variant" type="time" />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Formato</span>
+                <select name="format" required class="w-full border-outline-variant">
+                  <option value="">Selecione o formato...</option>
+                  <option>Presencial</option>
+                  <option>Online</option>
+                  <option>Híbrido</option>
+                </select>
+              </label>
+              <div>
+                <span class="mb-2 block text-sm font-medium">Local</span>
+                <div class="flex flex-wrap gap-2">
+                  <label class="cursor-pointer">
+                    <input class="peer sr-only" name="locations" type="checkbox" value="Auditório" />
+                    <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Auditório</span>
+                  </label>
+                  <label class="cursor-pointer">
+                    <input class="peer sr-only" name="locations" type="checkbox" value="Sala de reuniões" />
+                    <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Sala de reuniões</span>
+                  </label>
+                  <label class="cursor-pointer">
+                    <input class="peer sr-only" name="locations" type="checkbox" value="Pátio Externo" />
+                    <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Pátio Externo</span>
+                  </label>
+                  <label class="cursor-pointer">
+                    <input class="peer sr-only" name="locations" type="checkbox" value="Hall" />
+                    <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Hall</span>
+                  </label>
+                </div>
+              </div>
+              <label class="block md:col-span-2">
+                <span class="mb-1 block text-sm font-medium">Link de transmissão</span>
+                <input name="streamLink" class="w-full border-outline-variant" placeholder="https://" type="url" />
+              </label>
+            </div>
+          </section>
+
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-medium">3. Responsáveis e equipe</h3>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Área responsável</span>
+                <select name="responsibleArea" required class="w-full border-outline-variant">
+                  <option value="">Selecione a área...</option>
+                  <option>Centro de Pesquisa</option>
+                  <option>Centro de Memória e Informação</option>
+                  <option>Diretoria de Difusão Cultural</option>
+                  <option>Presidência</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Responsável principal</span>
+                <input name="mainResponsible" required class="w-full border-outline-variant" placeholder="Nome do servidor" type="text" />
+              </label>
+              <label class="block md:col-span-2">
+                <span class="mb-1 block text-sm font-medium">Equipe envolvida</span>
+                <input name="team" class="w-full border-outline-variant" placeholder="Digite nomes ou e-mails separados por vírgula" type="text" />
+              </label>
+            </div>
+          </section>
+
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-medium">4. Gatilhos operacionais</h3>
+            <div class="space-y-3">
+              <label class="flex cursor-pointer items-center justify-between gap-4">
+                <span>Vai ter convidados externos?</span>
+                <input name="hasExternalGuests" type="checkbox" class="peer sr-only" />
+                <span class="relative h-6 w-11 rounded-full bg-surface-container after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-container peer-checked:after:translate-x-full peer-checked:after:border-white"></span>
+              </label>
+              <label class="flex cursor-pointer items-center justify-between gap-4">
+                <span>Vai envolver fornecedores?</span>
+                <input name="hasSuppliers" type="checkbox" class="peer sr-only" />
+                <span class="relative h-6 w-11 rounded-full bg-surface-container after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-container peer-checked:after:translate-x-full peer-checked:after:border-white"></span>
+              </label>
+              <label class="flex cursor-pointer items-center justify-between gap-4">
+                <span>Vai exigir acessibilidade?</span>
+                <input name="requiresAccessibility" type="checkbox" class="peer sr-only" />
+                <span class="relative h-6 w-11 rounded-full bg-surface-container after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-container peer-checked:after:translate-x-full peer-checked:after:border-white"></span>
+              </label>
+              <label class="flex cursor-pointer items-center justify-between gap-4">
+                <span>Vai ter inscrição?</span>
+                <input name="hasRegistration" type="checkbox" class="peer sr-only" />
+                <span class="relative h-6 w-11 rounded-full bg-surface-container after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-container peer-checked:after:translate-x-full peer-checked:after:border-white"></span>
+              </label>
+              <label class="flex cursor-pointer items-center justify-between gap-4">
+                <span>Vai precisar de comunicação/divulgação?</span>
+                <input name="requiresCommunication" type="checkbox" class="peer sr-only" />
+                <span class="relative h-6 w-11 rounded-full bg-surface-container after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-container peer-checked:after:translate-x-full peer-checked:after:border-white"></span>
+              </label>
+            </div>
+          </section>
+        </div>
+      </form>
+
+      <div class="flex shrink-0 justify-end gap-4 border-t border-outline-variant bg-surface-container px-6 py-4">
+        <button id="cancelEvent" class="border border-outline-variant bg-white px-4 py-2 text-sm font-medium hover:bg-surface-container-low" type="button">Cancelar</button>
+        <button form="newEventForm" class="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-container" type="submit">
+          <span id="submitEventText">Criar evento</span>
+          <span class="material-symbols-outlined text-base">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="checklistItemModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-primary/40 p-4 backdrop-blur-sm">
+    <div class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-outline-variant bg-white shadow-xl">
+      <div class="flex items-start justify-between border-b border-outline-variant px-6 py-5">
+        <div>
+          <h2 class="text-xl font-semibold">Adicionar item</h2>
+          <p class="mt-1 text-sm text-on-surface-variant">Inclua uma nova etapa ou item de acompanhamento no checklist deste evento.</p>
+        </div>
+        <button id="closeChecklistItemModal" class="text-on-surface-variant hover:text-on-surface" type="button">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form id="checklistItemForm" class="flex-1 overflow-y-auto p-6">
+        <div class="space-y-5">
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium">Nome do item <span class="text-red-600">*</span></span>
+            <input name="title" required class="w-full rounded-md border-outline-variant" placeholder="Ex: Solicitar fotos e mini bios" type="text" />
+          </label>
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Área</span>
+              <select name="area" required class="w-full rounded-md border-outline-variant">
+                <option>Produção</option>
+                <option>Comunicação</option>
+                <option>Convidados</option>
+                <option>Fornecedores</option>
+                <option>Documentos</option>
+                <option>Infraestrutura</option>
+                <option>Acessibilidade</option>
+              </select>
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Responsável</span>
+              <select name="ownerName" class="w-full rounded-md border-outline-variant">
+                <option>A confirmar</option>
+                <option>Karina</option>
+                <option>Ana Silva</option>
+                <option>Marcelo</option>
+              </select>
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Prazo</span>
+              <input name="dueDate" class="w-full rounded-md border-outline-variant" placeholder="dd/mm/aaaa" type="date" />
+            </label>
+
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Status inicial</span>
+              <select name="status" class="w-full rounded-md border-outline-variant">
+                <option value="pendente">Pendente</option>
+                <option value="nao_iniciado">Não iniciado</option>
+                <option value="em_andamento">Em andamento</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium">Observação interna</span>
+            <textarea name="notes" class="w-full resize-none rounded-md border-outline-variant" placeholder="Inclua detalhes úteis para a equipe." rows="4"></textarea>
+          </label>
+        </div>
+      </form>
+
+      <div class="flex shrink-0 justify-end gap-4 border-t border-outline-variant bg-surface-container-low px-6 py-4">
+        <button id="cancelChecklistItem" class="rounded-md border border-outline-variant bg-white px-4 py-2 text-sm font-medium hover:bg-surface-container" type="button">Cancelar</button>
+        <button form="checklistItemForm" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-container" type="submit">
+          Adicionar item
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="communicationBriefingModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-primary/40 p-4 backdrop-blur-sm">
+    <div class="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-outline-variant bg-white shadow-xl">
+      <div class="flex items-start justify-between border-b border-outline-variant px-6 py-5">
+        <div>
+          <h2 class="text-xl font-semibold">Adicionar briefing</h2>
+          <p class="mt-1 text-sm text-on-surface-variant">Organize as informações que serão usadas pela comunicação.</p>
+        </div>
+        <button id="closeCommunicationBriefingModal" class="text-on-surface-variant hover:text-on-surface" type="button">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form id="communicationBriefingForm" class="flex-1 overflow-y-auto p-6">
+        <div class="space-y-5">
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium">Título de divulgação <span class="text-red-600">*</span></span>
+            <input name="officialTitle" required class="w-full rounded-md border-outline-variant" placeholder="Ex: Congresso Internacional de Literatura de Cordel" type="text" />
+          </label>
+
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium">Descrição curta <span class="text-red-600">*</span></span>
+            <textarea name="shortDescription" required class="w-full resize-none rounded-md border-outline-variant" placeholder="Resumo breve para divulgação." rows="3"></textarea>
+          </label>
+
+          <label class="block">
+            <span class="mb-1 block text-sm font-medium">Descrição completa</span>
+            <textarea name="fullDescription" class="w-full resize-none rounded-md border-outline-variant" placeholder="Texto mais completo para site, newsletter ou release." rows="4"></textarea>
+          </label>
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Link de inscrição</span>
+              <input name="registrationLink" class="w-full rounded-md border-outline-variant" placeholder="https://" type="url" />
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Link de transmissão</span>
+              <input name="streamingLink" class="w-full rounded-md border-outline-variant" placeholder="https://" type="url" />
+            </label>
+          </div>
+
+          <fieldset>
+            <legend class="mb-2 text-sm font-medium">Canais solicitados</legend>
+            <div class="flex flex-wrap gap-2">
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Site institucional" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Site institucional</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Instagram" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Instagram</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Newsletter" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Newsletter</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="YouTube" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">YouTube</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Mailing" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Mailing</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Banner interno" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Banner interno</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Crachá" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Crachá</span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="channels" type="checkbox" value="Peça impressa" />
+                <span class="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-sm peer-checked:border-primary-container peer-checked:bg-primary-container peer-checked:text-white">Peça impressa</span>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+      </form>
+
+      <div class="flex shrink-0 justify-end gap-4 border-t border-outline-variant bg-surface-container-low px-6 py-4">
+        <button id="cancelCommunicationBriefing" class="rounded-md border border-outline-variant bg-white px-4 py-2 text-sm font-medium hover:bg-surface-container" type="button">Cancelar</button>
+        <button form="communicationBriefingForm" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-container" type="submit">
+          Salvar briefing
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="eventDocumentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-primary/40 p-4 backdrop-blur-sm">
+    <div class="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-outline-variant bg-white shadow-xl">
+      <div class="flex items-start justify-between border-b border-outline-variant px-6 py-5">
+        <div>
+          <h2 class="text-xl font-semibold">Adicionar novo documento</h2>
+          <p class="mt-1 text-sm text-on-surface-variant">Crie um registro documental rastreável vinculado a este evento.</p>
+        </div>
+        <button id="closeEventDocumentModal" class="text-on-surface-variant hover:text-on-surface" type="button">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form id="eventDocumentForm" class="flex-1 overflow-y-auto p-6">
+        <div class="space-y-7">
+          <section>
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Origem do documento</h3>
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="origin" type="radio" value="registro_vazio" checked />
+                <span class="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-md border border-outline-variant bg-white p-3 text-center text-sm peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary">
+                  <span class="material-symbols-outlined">note_add</span>
+                  Criar registro vazio
+                </span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="origin" type="radio" value="upload" />
+                <span class="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-md border border-outline-variant bg-white p-3 text-center text-sm peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary">
+                  <span class="material-symbols-outlined">upload_file</span>
+                  Anexar arquivo
+                </span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="origin" type="radio" value="link" />
+                <span class="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-md border border-outline-variant bg-white p-3 text-center text-sm peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary">
+                  <span class="material-symbols-outlined">link</span>
+                  Adicionar link
+                </span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="origin" type="radio" value="modelo" />
+                <span class="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-md border border-outline-variant bg-white p-3 text-center text-sm peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary">
+                  <span class="material-symbols-outlined">description</span>
+                  Usar modelo
+                </span>
+              </label>
+              <label class="cursor-pointer">
+                <input class="peer sr-only" name="origin" type="radio" value="ia" />
+                <span class="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-md border border-outline-variant bg-white p-3 text-center text-sm peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary">
+                  <span class="material-symbols-outlined">auto_awesome</span>
+                  Usar minuta IA
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Dados principais</h3>
+            <div class="space-y-4">
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Nome do documento <span class="text-red-600">*</span></span>
+                <input name="title" required class="w-full rounded-md border-outline-variant" placeholder="Ex: Termo de Referência - Iluminação" type="text" />
+              </label>
+
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label class="block">
+                  <span class="mb-1 block text-sm font-medium">Tipo</span>
+                  <select name="documentType" class="w-full rounded-md border-outline-variant">
+                    <option>Ofício-convite</option>
+                    <option>Solicitação interna</option>
+                    <option>Termo de referência</option>
+                    <option>Solicitação de parceria</option>
+                    <option>Briefing</option>
+                    <option>Contrato</option>
+                    <option>Relatório pós-evento</option>
+                    <option>Outro</option>
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="mb-1 block text-sm font-medium">Categoria</span>
+                  <select name="category" class="w-full rounded-md border-outline-variant">
+                    <option>Abertura do evento</option>
+                    <option>Convites</option>
+                    <option>Parcerias</option>
+                    <option>Comunicação</option>
+                    <option>Convidados</option>
+                    <option>Fornecedores</option>
+                    <option>Produção</option>
+                    <option>Execução</option>
+                    <option>Encerramento e memória</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Link do documento</span>
+                <input name="fileUrl" class="w-full rounded-md border-outline-variant" placeholder="https://docs.google.com/..." type="url" />
+              </label>
+
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Descrição curta ou observação interna</span>
+                <textarea name="notes" class="w-full resize-none rounded-md border-outline-variant" placeholder="Adicione detalhes contextuais sobre este documento." rows="3"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Acompanhamento</h3>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Status inicial</span>
+                <select name="status" class="w-full rounded-md border-outline-variant">
+                  <option value="aguardando_criacao">Aguardando criação</option>
+                  <option value="em_elaboracao">Em elaboração</option>
+                  <option value="minuta_gerada">Minuta gerada</option>
+                  <option value="em_revisao">Em revisão</option>
+                  <option value="aguardando_aprovacao">Aguardando aprovação</option>
+                  <option value="aprovado">Aprovado</option>
+                  <option value="enviado">Enviado</option>
+                  <option value="arquivado">Arquivado</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Prazo</span>
+                <input name="dueDate" class="w-full rounded-md border-outline-variant" type="date" />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Responsável</span>
+                <select name="ownerName" class="w-full rounded-md border-outline-variant">
+                  <option>A confirmar</option>
+                  <option>Karina</option>
+                  <option>Ana Silva</option>
+                  <option>Marcelo</option>
+                  <option>Equipe de produção</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Área responsável</span>
+                <select name="responsibleArea" class="w-full rounded-md border-outline-variant">
+                  <option>Centro de Pesquisa</option>
+                  <option>Centro de Memória e Informação</option>
+                  <option>Diretoria de Difusão Cultural</option>
+                  <option>Comunicação</option>
+                  <option>Produção</option>
+                  <option>Administração</option>
+                </select>
+              </label>
+              <label class="block md:col-span-2">
+                <span class="mb-1 block text-sm font-medium">Nível de acesso</span>
+                <select name="accessLevel" class="w-full rounded-md border-outline-variant">
+                  <option value="interno">Interno</option>
+                  <option value="publico">Público</option>
+                  <option value="restrito">Restrito</option>
+                  <option value="sensivel">Sensível</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="rounded-md border border-outline-variant bg-surface-container-lowest p-4">
+            <label class="flex items-start gap-3">
+              <input name="createChecklistItem" class="mt-1 rounded border-outline-variant text-primary focus:ring-primary" type="checkbox" />
+              <span>
+                <span class="block text-sm font-medium">Criar pendência vinculada no checklist</span>
+                <span class="mt-1 block text-sm text-on-surface-variant">Use esta opção quando o documento exigir acompanhamento, prazo ou validação da equipe.</span>
+              </span>
+            </label>
+          </section>
+        </div>
+      </form>
+
+      <div class="flex shrink-0 justify-end gap-4 border-t border-outline-variant bg-surface-container-low px-6 py-4">
+        <button id="cancelEventDocument" class="rounded-md border border-outline-variant bg-white px-4 py-2 text-sm font-medium hover:bg-surface-container" type="button">Cancelar</button>
+        <button form="eventDocumentForm" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-container" type="submit">
+          Salvar documento
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="documentAiModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-primary/40 p-4 backdrop-blur-sm">
+    <div class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-outline-variant bg-white shadow-lg">
+      <div class="flex items-start justify-between border-b border-outline-variant bg-surface-container-lowest px-6 py-5">
+        <div class="flex items-start gap-4">
+          <div class="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-white">
+            <span class="material-symbols-outlined">smart_toy</span>
+          </div>
+          <div>
+            <h2 class="text-xl font-semibold text-primary">Gerar minuta com IA</h2>
+            <p class="mt-1 text-sm text-on-surface-variant">Preencha o contexto para gerar uma sugestão de texto institucional revisável.</p>
+          </div>
+        </div>
+        <button id="closeDocumentAiModal" class="text-on-surface-variant hover:text-on-surface" type="button">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div class="grid flex-1 overflow-y-auto lg:grid-cols-[380px_1fr]">
+        <form id="documentAiForm" class="space-y-6 border-b border-outline-variant bg-white p-6 lg:border-b-0 lg:border-r">
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-semibold text-primary">Tipo e objetivo</h3>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Tipo de minuta</span>
+              <select name="draftType" class="w-full rounded-md border-outline-variant">
+                <option value="oficio_convite">Ofício-convite</option>
+                <option value="solicitacao_parceria">Solicitação de parceria</option>
+                <option value="mensagem_convidado">Mensagem para convidado</option>
+                <option value="relatorio_pos_evento">Relatório pós-evento</option>
+                <option value="briefing_evento">Briefing do evento</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Objetivo principal</span>
+              <textarea name="goal" class="w-full resize-none rounded-md border-outline-variant" placeholder="Ex: convidar palestrante para a mesa de abertura." rows="3"></textarea>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Modelo base</span>
+              <select name="modelBase" class="w-full rounded-md border-outline-variant">
+                <option value="padrao_fcrb_oficio">Padrão FCRB - Ofício externo</option>
+                <option value="convite_institucional">Convite institucional</option>
+                <option value="mensagem_operacional">Mensagem operacional</option>
+                <option value="relatorio_memoria">Relatório de memória</option>
+                <option value="sem_modelo">Sem modelo específico</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-semibold text-primary">Destinatário</h3>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Nome/Público</span>
+              <input name="recipientName" class="w-full rounded-md border-outline-variant" placeholder="Ex: Dr. João da Silva" type="text" />
+            </label>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Instituição</span>
+                <input name="recipientInstitution" class="w-full rounded-md border-outline-variant" placeholder="Ex: UFRJ" type="text" />
+              </label>
+              <label class="block">
+                <span class="mb-1 block text-sm font-medium">Cargo/Função</span>
+                <input name="recipientRole" class="w-full rounded-md border-outline-variant" placeholder="Ex: Diretor" type="text" />
+              </label>
+            </div>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Canal de envio previsto</span>
+              <select name="deliveryChannel" class="w-full rounded-md border-outline-variant">
+                <option value="sei">SEI</option>
+                <option value="email">E-mail</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="impresso">Impresso</option>
+                <option value="a_definir">A definir</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="space-y-4">
+            <h3 class="border-b border-outline-variant pb-2 text-lg font-semibold text-primary">Contexto</h3>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Texto base / ideia central</span>
+              <textarea name="sourceText" class="w-full resize-none rounded-md border-outline-variant" placeholder="Cole aqui um rascunho, e-mail ou orientação." rows="4"></textarea>
+            </label>
+            <fieldset>
+              <legend class="mb-2 block text-sm font-medium">Tom desejado</legend>
+              <div class="flex flex-wrap gap-2">
+                <label class="inline-flex items-center gap-2 rounded border border-outline-variant px-3 py-2 text-sm">
+                  <input name="tone" class="border-outline-variant text-primary focus:ring-primary" type="radio" value="formal" checked />
+                  Formal
+                </label>
+                <label class="inline-flex items-center gap-2 rounded border border-outline-variant px-3 py-2 text-sm">
+                  <input name="tone" class="border-outline-variant text-primary focus:ring-primary" type="radio" value="muito_formal" />
+                  Muito formal
+                </label>
+                <label class="inline-flex items-center gap-2 rounded border border-outline-variant px-3 py-2 text-sm">
+                  <input name="tone" class="border-outline-variant text-primary focus:ring-primary" type="radio" value="conciso" />
+                  Conciso
+                </label>
+              </div>
+            </fieldset>
+            <label class="flex items-start gap-3 rounded border border-outline-variant bg-surface-container-lowest p-3">
+              <input name="useEventData" class="mt-1 rounded border-outline-variant text-primary focus:ring-primary" type="checkbox" checked />
+              <span>
+                <span class="block text-sm font-medium">Usar dados do evento vinculado</span>
+                <span class="mt-1 block text-xs text-on-surface-variant">Nome, data, local, formato, área responsável e descrição entram como contexto.</span>
+              </span>
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium">Observações internas</span>
+              <textarea name="notes" class="w-full resize-none rounded-md border-outline-variant" placeholder="Inclua restrições, prazos, dados que não podem faltar ou cuidados de linguagem." rows="3"></textarea>
+            </label>
+          </section>
+
+          <div class="rounded border-l-2 border-outline bg-surface-container-low p-3 text-xs leading-5 text-on-surface-variant">
+            A IA sugere e organiza. A revisão, aprovação e envio permanecem sob responsabilidade da equipe.
+          </div>
+        </form>
+
+        <div class="flex min-h-[620px] flex-col bg-surface-container-low p-6">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-semibold text-primary">Resultado</h3>
+              <p class="text-sm text-on-surface-variant">A minuta gerada fica salva no histórico do evento.</p>
+            </div>
+            <button form="documentAiForm" class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-container" type="submit">
+              <span class="material-symbols-outlined text-base">auto_awesome</span>
+              Gerar minuta
+            </button>
+          </div>
+          <div id="documentAiResult" class="mt-4 flex-1">
+            <div class="rounded border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface-variant">
+              A minuta aparecerá aqui após a geração.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex shrink-0 items-center justify-between gap-4 border-t border-outline-variant bg-surface-container-lowest px-6 py-4">
+        <p class="text-sm text-on-surface-variant">A IA sugere. A equipe revisa, aprova e envia.</p>
+        <button id="cancelDocumentAi" class="rounded-md border border-outline-variant bg-white px-4 py-2 text-sm font-medium hover:bg-surface-container" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js?v=20260506-ai-modal-flow"></script>
+</body>
+</html>
