@@ -143,8 +143,8 @@ function documentTemplateToClient(row, usageByTemplateId = new Map()) {
   return {
     id: row.id,
     name: row.name,
-    templateType: row.template_type,
-    body: row.body,
+    templateType: row.template_type || row.document_type || row.category,
+    body: row.body || row.body_template || "",
     used: Boolean(usage),
     usedAt: usage?.used_at || null
   };
@@ -180,7 +180,7 @@ function aiDraftToClient(row) {
     id: row.id,
     draftType: row.draft_type,
     generatedText: row.generated_text,
-    provider: row.provider,
+    provider: row.provider || "local",
     model: row.model,
     createdAt: row.created_at
   };
@@ -413,13 +413,13 @@ async function getCommunicationRequest(eventId) {
   }
 
   const rows = await selectRows("communication_requests", {
-    select: "event_id,official_title,short_description,full_description,registration_link,streaming_link,channels,status,updated_at",
+    select: "event_id,title,short_description,full_description,registration_link,streaming_link,channels,status,updated_at",
     event_id: `eq.${eventId}`,
     limit: "1"
   });
   const row = rows[0] || {
     event_id: event.id,
-    official_title: event.official_name,
+    title: event.official_name,
     short_description: event.short_description,
     full_description: event.full_description,
     registration_link: null,
@@ -459,7 +459,7 @@ async function saveCommunicationRequest(eventId, payload) {
     },
     body: [{
       event_id: eventId,
-      official_title: officialTitle,
+      title: officialTitle,
       short_description: shortDescription,
       full_description: payload.fullDescription || null,
       registration_link: payload.registrationLink || null,
@@ -476,7 +476,7 @@ async function saveCommunicationRequest(eventId, payload) {
 
 async function getDocumentAiHistory(eventId) {
   const rows = await selectRows("document_ai_drafts", {
-    select: "id,draft_type,generated_text,provider,model,created_at",
+    select: "id,draft_type,generated_text,model,created_at",
     event_id: `eq.${eventId}`,
     order: "created_at.desc,id.desc",
     limit: "5"
@@ -504,7 +504,7 @@ async function getEventDocuments(eventId) {
   });
   const usersById = await getUsersByIds(splitIds(items, "owner_user_id"));
   const templates = await selectRows("document_templates", {
-    select: "id,name,template_type,body",
+    select: "id,name,category,document_type,body_template",
     order: "name.asc"
   });
   const usageRows = await selectRows("event_template_usage", {
@@ -597,7 +597,7 @@ async function getEventContextForAi(eventId) {
 
   const usersById = await getUsersByIds([event.lead_user_id]);
   const communicationRows = await selectRows("communication_requests", {
-    select: "official_title,short_description,full_description,registration_link,streaming_link,channels",
+    select: "title,short_description,full_description,registration_link,streaming_link,channels",
     event_id: `eq.${eventId}`,
     limit: "1"
   });
@@ -606,7 +606,7 @@ async function getEventContextForAi(eventId) {
   return {
     ...event,
     responsavel: usersById.get(event.lead_user_id)?.name || "Responsável não informado",
-    communication_title: communication.official_title,
+    communication_title: communication.title,
     communication_short_description: communication.short_description,
     communication_full_description: communication.full_description,
     registration_link: communication.registration_link,
@@ -792,7 +792,6 @@ async function generateDocumentAiDraft(eventId, payload) {
     draft_type: String(payload.draftType || "oficio_convite"),
     prompt_context: prompt,
     generated_text: generatedText,
-    provider,
     model
   }]);
   const draft = inserted[0];
@@ -803,14 +802,14 @@ async function generateDocumentAiDraft(eventId, payload) {
     action: "gerou_minuta_ia_documentos",
     entity_type: "document_ai_draft",
     entity_id: draft.id,
-    details: String(payload.draftType || "oficio_convite")
+    metadata: { draft_type: String(payload.draftType || "oficio_convite"), provider, model }
   }], { prefer: "return=minimal" });
 
   return {
     id: draft.id,
     draftType: draft.draft_type,
     generatedText: draft.generated_text,
-    provider: draft.provider,
+    provider,
     model: draft.model,
     warning
   };
