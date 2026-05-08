@@ -1722,6 +1722,19 @@ async function loadEvents() {
   }
 }
 
+async function readJsonResponse(response) {
+  const text = await response.text();
+
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    const fallbackMessage = response.ok
+      ? "A API retornou uma resposta invalida."
+      : `A API retornou uma resposta invalida (${response.status}). Verifique se a rota existe no deploy atual.`;
+    throw new Error(fallbackMessage);
+  }
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
 
@@ -1765,7 +1778,7 @@ async function handleSubmit(event) {
         },
         body: JSON.stringify(newEvent)
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response);
       if (!response.ok) throw new Error(payload.error || "Não foi possível salvar o evento.");
 
       if (editingEvent) {

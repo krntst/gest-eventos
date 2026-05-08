@@ -1,4 +1,4 @@
-const { selectRows, insertRows } = require("../lib/supabase");
+const { supabaseRequest, selectRows, insertRows } = require("../lib/supabase");
 
 function sendJson(response, statusCode, payload) {
   response.statusCode = statusCode;
@@ -260,6 +260,65 @@ async function createEvent(payload) {
   }]);
 
   const event = inserted[0];
+  return eventToClient(event, {
+    usersById: new Map([[leadUser.id, leadUser]])
+  });
+}
+
+async function updateEvent(eventId, payload) {
+  const requiredFields = ["eventName", "eventType", "startDate", "format", "responsibleArea", "mainResponsible"];
+  const missing = requiredFields.filter((field) => !String(payload[field] || "").trim());
+
+  if (missing.length) {
+    const error = new Error(`Campos obrigatorios ausentes: ${missing.join(", ")}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const existing = await selectRows("events", {
+    select: "id",
+    id: `eq.${eventId}`,
+    limit: "1"
+  });
+
+  if (!existing[0]) {
+    const error = new Error("Evento nao encontrado.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const leadUser = await getOrCreateLeadUser(payload.mainResponsible);
+  const format = normalizeEnum(payload.format, "presencial");
+  const locations = Array.isArray(payload.locations) && payload.locations.length
+    ? payload.locations.join(", ")
+    : "Local a definir";
+  const shortDescription = String(payload.eventDescription || "Sem descricao curta.").trim();
+
+  const updated = await supabaseRequest("events", {
+    method: "PATCH",
+    search: {
+      id: `eq.${eventId}`
+    },
+    body: {
+      official_name: String(payload.eventName).trim(),
+      event_type: String(payload.eventType).trim(),
+      event_date: payload.startDate,
+      start_time: payload.startTime || "00:00",
+      end_time: payload.endTime || null,
+      location: locations,
+      format,
+      responsible_area: String(payload.responsibleArea).trim(),
+      lead_user_id: leadUser.id,
+      short_description: shortDescription,
+      full_description: shortDescription,
+      accessibility_needs: payload.triggers?.requiresAccessibility ? "Acessibilidade solicitada." : null,
+      internal_notes: payload.team ? `Equipe informada: ${payload.team}` : null,
+      updated_at: new Date().toISOString()
+    },
+    prefer: "return=representation"
+  });
+
+  const event = updated[0];
   return eventToClient(event, {
     usersById: new Map([[leadUser.id, leadUser]])
   });
@@ -602,6 +661,14 @@ module.exports = async function handler(request, response) {
       const payload = await readJson(request);
       const event = await createEvent(payload);
       sendJson(response, 201, { event });
+      return;
+    }
+
+    const eventMatch = pathname.match(/^\/api\/events\/(\d+)$/);
+    if (request.method === "PATCH" && eventMatch) {
+      const payload = await readJson(request);
+      const event = await updateEvent(Number(eventMatch[1]), payload);
+      sendJson(response, 200, { event });
       return;
     }
 
