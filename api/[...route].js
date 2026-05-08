@@ -812,7 +812,11 @@ async function generateDocumentAiDraft(eventId, payload) {
     action: "gerou_minuta_ia_documentos",
     entity_type: "document_ai_draft",
     entity_id: draft.id,
-    metadata: { draft_type: String(payload.draftType || "oficio_convite"), provider, model }
+    details: JSON.stringify({
+      draft_type: String(payload.draftType || "oficio_convite"),
+      provider,
+      model
+    })
   }], { prefer: "return=minimal" });
 
   return {
