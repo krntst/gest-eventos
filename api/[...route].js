@@ -451,31 +451,41 @@ async function saveCommunicationRequest(eventId, payload) {
     throw error;
   }
 
-  const rows = await supabaseRequest("communication_requests", {
-    method: "POST",
-    search: {
-      on_conflict: "event_id"
-    },
-    body: [{
-      event_id: eventId,
-      official_title: officialTitle,
-      short_description: shortDescription,
-      full_description: payload.fullDescription || null,
-      registration_link: payload.registrationLink || null,
-      streaming_link: payload.streamingLink || null,
-      channels: Array.isArray(payload.channels) ? payload.channels.join(", ") : String(payload.channels || ""),
-      status: "aguardando_informacoes",
-      updated_at: new Date().toISOString()
-    }],
-    prefer: "resolution=merge-duplicates,return=representation"
+  const body = {
+    official_title: officialTitle,
+    short_description: shortDescription,
+    full_description: payload.fullDescription || null,
+    registration_link: payload.registrationLink || null,
+    streaming_link: payload.streamingLink || null,
+    channels: Array.isArray(payload.channels) ? payload.channels.join(", ") : String(payload.channels || ""),
+    status: "aguardando_informacoes",
+    updated_at: new Date().toISOString()
+  };
+  const existingRows = await selectRows("communication_requests", {
+    select: "id",
+    event_id: `eq.${eventId}`,
+    limit: "1"
   });
+  const rows = existingRows[0]
+    ? await supabaseRequest("communication_requests", {
+      method: "PATCH",
+      search: {
+        id: `eq.${existingRows[0].id}`
+      },
+      body,
+      prefer: "return=representation"
+    })
+    : await insertRows("communication_requests", [{
+      event_id: eventId,
+      ...body
+    }]);
 
   return communicationToClient(rows[0]);
 }
 
 async function getDocumentAiHistory(eventId) {
   const rows = await selectRows("document_ai_drafts", {
-    select: "id,draft_type,generated_text,model,created_at",
+    select: "id,draft_type,generated_text,provider,model,created_at",
     event_id: `eq.${eventId}`,
     order: "created_at.desc,id.desc",
     limit: "5"
@@ -791,6 +801,7 @@ async function generateDocumentAiDraft(eventId, payload) {
     draft_type: String(payload.draftType || "oficio_convite"),
     prompt_context: prompt,
     generated_text: generatedText,
+    provider,
     model
   }]);
   const draft = inserted[0];
