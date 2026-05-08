@@ -43,6 +43,11 @@ function splitIds(rows, key) {
   return [...new Set(rows.map((row) => row[key]).filter(Boolean))];
 }
 
+function buildLeadUserEmail(name) {
+  const slug = normalizeEnum(name, "responsavel").replace(/[^a-z0-9_]/g, "");
+  return `${slug || "responsavel"}@teste.local`;
+}
+
 async function getUsersByIds(ids = []) {
   if (!ids.length) return new Map();
   const users = await selectRows("users", {
@@ -50,6 +55,27 @@ async function getUsersByIds(ids = []) {
     id: `in.(${ids.join(",")})`
   });
   return new Map(users.map((user) => [user.id, user]));
+}
+
+async function getOrCreateLeadUser(name) {
+  const leadName = String(name || "Responsavel nao informado").trim();
+  const email = buildLeadUserEmail(leadName);
+  const existing = await selectRows("users", {
+    select: "id,name",
+    email: `eq.${email}`,
+    limit: "1"
+  });
+
+  if (existing[0]) return existing[0];
+
+  const inserted = await insertRows("users", [{
+    name: leadName,
+    email,
+    role: "gestor_eventos",
+    department: "Setor de Eventos"
+  }]);
+
+  return inserted[0];
 }
 
 function eventToClient(row, helpers = {}) {
@@ -198,6 +224,46 @@ async function listEvents() {
     pendingCountByEventId,
     criticalByEventId
   }));
+}
+
+async function createEvent(payload) {
+  const requiredFields = ["eventName", "eventType", "startDate", "format", "responsibleArea", "mainResponsible"];
+  const missing = requiredFields.filter((field) => !String(payload[field] || "").trim());
+
+  if (missing.length) {
+    const error = new Error(`Campos obrigatorios ausentes: ${missing.join(", ")}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const leadUser = await getOrCreateLeadUser(payload.mainResponsible);
+  const format = normalizeEnum(payload.format, "presencial");
+  const locations = Array.isArray(payload.locations) && payload.locations.length
+    ? payload.locations.join(", ")
+    : "Local a definir";
+  const shortDescription = String(payload.eventDescription || "Sem descricao curta.").trim();
+
+  const inserted = await insertRows("events", [{
+    official_name: String(payload.eventName).trim(),
+    event_type: String(payload.eventType).trim(),
+    event_date: payload.startDate,
+    start_time: payload.startTime || "00:00",
+    end_time: payload.endTime || null,
+    location: locations,
+    format,
+    responsible_area: String(payload.responsibleArea).trim(),
+    lead_user_id: leadUser.id,
+    short_description: shortDescription,
+    full_description: shortDescription,
+    accessibility_needs: payload.triggers?.requiresAccessibility ? "Acessibilidade solicitada." : null,
+    status: "em_planejamento",
+    internal_notes: payload.team ? `Equipe informada: ${payload.team}` : null
+  }]);
+
+  const event = inserted[0];
+  return eventToClient(event, {
+    usersById: new Map([[leadUser.id, leadUser]])
+  });
 }
 
 async function getChecklistItems(eventId) {
@@ -530,6 +596,13 @@ module.exports = async function handler(request, response) {
 
     if (request.method === "GET" && pathname === "/api/events") {
       sendJson(response, 200, { events: await listEvents() });
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/events") {
+      const payload = await readJson(request);
+      const event = await createEvent(payload);
+      sendJson(response, 201, { event });
       return;
     }
 
