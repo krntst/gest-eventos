@@ -806,18 +806,22 @@ async function generateDocumentAiDraft(eventId, payload) {
   }]);
   const draft = inserted[0];
 
-  await insertRows("audit_log", [{
-    event_id: eventId,
-    actor_user_id: eventContext.lead_user_id,
-    action: "gerou_minuta_ia_documentos",
-    entity_type: "document_ai_draft",
-    entity_id: draft.id,
-    details: JSON.stringify({
-      draft_type: String(payload.draftType || "oficio_convite"),
-      provider,
-      model
-    })
-  }], { prefer: "return=minimal" });
+  try {
+    await insertRows("audit_log", [{
+      event_id: eventId,
+      actor_user_id: eventContext.lead_user_id,
+      action: "gerou_minuta_ia_documentos",
+      entity_type: "document_ai_draft",
+      entity_id: draft.id,
+      details: JSON.stringify({
+        draft_type: String(payload.draftType || "oficio_convite"),
+        provider,
+        model
+      })
+    }], { prefer: "return=minimal" });
+  } catch (error) {
+    console.warn("Nao foi possivel registrar audit_log da minuta:", error.message);
+  }
 
   return {
     id: draft.id,
