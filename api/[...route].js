@@ -71,8 +71,7 @@ async function getOrCreateLeadUser(name) {
   const inserted = await insertRows("users", [{
     name: leadName,
     email,
-    role: "gestor_eventos",
-    department: "Setor de Eventos"
+    role: "gestor_eventos"
   }]);
 
   return inserted[0];
