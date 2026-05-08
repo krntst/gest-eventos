@@ -71,7 +71,7 @@ async function getOrCreateLeadUser(name) {
   const inserted = await insertRows("users", [{
     name: leadName,
     email,
-    role: "gestor_eventos"
+    role: "gestor_evento"
   }]);
 
   return inserted[0];
@@ -113,8 +113,8 @@ function checklistItemToClient(row, usersById = new Map()) {
     id: row.id,
     eventDbId: row.event_id,
     title: row.title,
-    area: row.area || row.category,
-    category: row.category,
+    area: row.area,
+    category: row.area,
     status: row.status,
     ownerName: owner?.name || "Sem responsável",
     dueDate: row.due_date,
@@ -126,7 +126,7 @@ function checklistItemToClient(row, usersById = new Map()) {
 function communicationToClient(row) {
   return {
     eventDbId: row.event_id,
-    officialTitle: row.official_title,
+    officialTitle: row.official_title || row.title,
     shortDescription: row.short_description,
     fullDescription: row.full_description,
     registrationLink: row.registration_link,
@@ -201,7 +201,7 @@ async function listEvents() {
     : [];
   const checklistRows = eventIds.length
     ? await selectRows("checklist_items", {
-      select: "id,event_id,title,area,category,status,due_date",
+      select: "id,event_id,title,area,status,due_date",
       event_id: `in.(${eventIds.join(",")})`,
       status: "in.(nao_iniciado,em_andamento,pendente,atrasado)",
       order: "due_date.asc,id.asc"
@@ -326,12 +326,77 @@ async function updateEvent(eventId, payload) {
 
 async function getChecklistItems(eventId) {
   const items = await selectRows("checklist_items", {
-    select: "id,event_id,title,area,category,status,due_date,completed_at,notes,owner_user_id",
+    select: "id,event_id,title,area,status,due_date,completed_at,notes,owner_user_id",
     event_id: `eq.${eventId}`,
     order: "due_date.asc,id.asc"
   });
   const usersById = await getUsersByIds(splitIds(items, "owner_user_id"));
   return items.map((item) => checklistItemToClient(item, usersById));
+}
+
+async function createChecklistItem(eventId, payload) {
+  const title = String(payload.title || "").trim();
+  if (!title) {
+    const error = new Error("Nome do item obrigatorio.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const events = await selectRows("events", {
+    select: "id,lead_user_id",
+    id: `eq.${eventId}`,
+    limit: "1"
+  });
+  const event = events[0];
+  if (!event) {
+    const error = new Error("Evento nao encontrado.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const ownerName = String(payload.ownerName || "").trim();
+  const owner = ownerName && ownerName !== "A confirmar"
+    ? await getOrCreateLeadUser(ownerName)
+    : null;
+
+  const inserted = await insertRows("checklist_items", [{
+    event_id: eventId,
+    title,
+    area: String(payload.area || "Produção").trim(),
+    status: String(payload.status || "pendente"),
+    owner_user_id: owner?.id || event.lead_user_id || null,
+    due_date: payload.dueDate || null,
+    notes: payload.notes || null
+  }]);
+
+  const usersById = await getUsersByIds(splitIds(inserted, "owner_user_id"));
+  return checklistItemToClient(inserted[0], usersById);
+}
+
+async function updateChecklistItem(itemId, payload) {
+  const status = payload.done ? "concluido" : "pendente";
+  const completedAt = payload.done ? new Date().toISOString() : null;
+  const updated = await supabaseRequest("checklist_items", {
+    method: "PATCH",
+    search: {
+      id: `eq.${itemId}`
+    },
+    body: {
+      status,
+      completed_at: completedAt,
+      updated_at: new Date().toISOString()
+    },
+    prefer: "return=representation"
+  });
+
+  if (!updated[0]) {
+    const error = new Error("Item de checklist nao encontrado.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const usersById = await getUsersByIds(splitIds(updated, "owner_user_id"));
+  return checklistItemToClient(updated[0], usersById);
 }
 
 async function getCommunicationRequest(eventId) {
@@ -365,6 +430,48 @@ async function getCommunicationRequest(eventId) {
   };
 
   return communicationToClient(row);
+}
+
+async function saveCommunicationRequest(eventId, payload) {
+  const officialTitle = String(payload.officialTitle || "").trim();
+  const shortDescription = String(payload.shortDescription || "").trim();
+  if (!officialTitle || !shortDescription) {
+    const error = new Error("Titulo e descricao curta sao obrigatorios.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const events = await selectRows("events", {
+    select: "id",
+    id: `eq.${eventId}`,
+    limit: "1"
+  });
+  if (!events[0]) {
+    const error = new Error("Evento nao encontrado.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const rows = await supabaseRequest("communication_requests", {
+    method: "POST",
+    search: {
+      on_conflict: "event_id"
+    },
+    body: [{
+      event_id: eventId,
+      official_title: officialTitle,
+      short_description: shortDescription,
+      full_description: payload.fullDescription || null,
+      registration_link: payload.registrationLink || null,
+      streaming_link: payload.streamingLink || null,
+      channels: Array.isArray(payload.channels) ? payload.channels.join(", ") : String(payload.channels || ""),
+      status: "aguardando_informacoes",
+      updated_at: new Date().toISOString()
+    }],
+    prefer: "resolution=merge-duplicates,return=representation"
+  });
+
+  return communicationToClient(rows[0]);
 }
 
 async function getDocumentAiHistory(eventId) {
@@ -411,6 +518,68 @@ async function getEventDocuments(eventId) {
     templates: templates.map((template) => documentTemplateToClient(template, usageByTemplateId)),
     aiDrafts: await getDocumentAiHistory(eventId)
   };
+}
+
+async function createEventDocument(eventId, payload) {
+  const title = String(payload.title || "").trim();
+  if (!title) {
+    const error = new Error("Nome do documento obrigatorio.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const events = await selectRows("events", {
+    select: "id,lead_user_id",
+    id: `eq.${eventId}`,
+    limit: "1"
+  });
+  const event = events[0];
+  if (!event) {
+    const error = new Error("Evento nao encontrado.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const ownerName = String(payload.ownerName || "").trim();
+  const owner = ownerName && ownerName !== "A confirmar"
+    ? await getOrCreateLeadUser(ownerName)
+    : null;
+  const origin = String(payload.origin || "registro_vazio");
+
+  const inserted = await insertRows("event_documents", [{
+    event_id: eventId,
+    title,
+    document_type: String(payload.documentType || "Outro"),
+    category: String(payload.category || "Produção"),
+    origin,
+    status: String(payload.status || "aguardando_criacao"),
+    owner_user_id: owner?.id || event.lead_user_id || null,
+    responsible_area: payload.responsibleArea || null,
+    due_date: payload.dueDate || null,
+    access_level: payload.accessLevel || "interno",
+    version: "v1",
+    file_label: origin === "upload" ? "Arquivo a anexar" : null,
+    file_url: origin === "link" ? payload.fileUrl || null : payload.fileUrl || null,
+    notes: payload.notes || null,
+    source_draft_id: payload.sourceDraftId || null
+  }]);
+
+  const usersById = await getUsersByIds(splitIds(inserted, "owner_user_id"));
+  const document = eventDocumentToClient(inserted[0], usersById);
+  let checklistItem = null;
+
+  if (payload.createChecklistItem) {
+    checklistItem = await createChecklistItem(eventId, {
+      title: `Acompanhar documento: ${title}`,
+      area: "Documentos",
+      status: "pendente",
+      ownerName: ownerName || "A confirmar",
+      dueDate: payload.dueDate || null,
+      notes: payload.notes || "Pendencia criada a partir de documento."
+    });
+  }
+
+  return { document, checklistItem };
 }
 
 async function getEventContextForAi(eventId) {
@@ -678,15 +847,44 @@ module.exports = async function handler(request, response) {
       return;
     }
 
+    if (request.method === "POST" && checklistMatch) {
+      const payload = await readJson(request);
+      const item = await createChecklistItem(Number(checklistMatch[1]), payload);
+      sendJson(response, 201, { item });
+      return;
+    }
+
+    const checklistItemMatch = pathname.match(/^\/api\/checklist-items\/(\d+)$/);
+    if (request.method === "PATCH" && checklistItemMatch) {
+      const payload = await readJson(request);
+      const item = await updateChecklistItem(Number(checklistItemMatch[1]), payload);
+      sendJson(response, 200, { item });
+      return;
+    }
+
     const communicationMatch = pathname.match(/^\/api\/events\/(\d+)\/communication$/);
     if (request.method === "GET" && communicationMatch) {
       sendJson(response, 200, { communication: await getCommunicationRequest(Number(communicationMatch[1])) });
       return;
     }
 
+    if (request.method === "PATCH" && communicationMatch) {
+      const payload = await readJson(request);
+      const communication = await saveCommunicationRequest(Number(communicationMatch[1]), payload);
+      sendJson(response, 200, { communication });
+      return;
+    }
+
     const documentsMatch = pathname.match(/^\/api\/events\/(\d+)\/documents$/);
     if (request.method === "GET" && documentsMatch) {
       sendJson(response, 200, await getEventDocuments(Number(documentsMatch[1])));
+      return;
+    }
+
+    if (request.method === "POST" && documentsMatch) {
+      const payload = await readJson(request);
+      const result = await createEventDocument(Number(documentsMatch[1]), payload);
+      sendJson(response, 201, result);
       return;
     }
 

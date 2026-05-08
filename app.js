@@ -1300,7 +1300,7 @@ async function loadChecklistItems(event) {
 
   try {
     const response = await fetch(`/api/events/${event.dbId}/checklist`);
-    const payload = await response.json();
+    const payload = await readJsonResponse(response);
     if (!response.ok) throw new Error(payload.error || "Não foi possível carregar o checklist.");
     checklistItems = payload.items || [];
     checklistLoadedEventId = event.id;
@@ -1326,7 +1326,7 @@ async function loadCommunicationDetails(event) {
 
   try {
     const response = await fetch(`/api/events/${event.dbId}/communication`);
-    const payload = await response.json();
+    const payload = await readJsonResponse(response);
     if (!response.ok) throw new Error(payload.error || "Não foi possível carregar comunicação.");
     communicationDetails = payload.communication || getDefaultCommunication(event);
     communicationLoadedEventId = event.id;
@@ -1352,7 +1352,7 @@ async function loadDocumentDetails(event) {
 
   try {
     const response = await fetch(`/api/events/${event.dbId}/documents`);
-    const payload = await response.json();
+    const payload = await readJsonResponse(response);
     if (!response.ok) throw new Error(payload.error || "Não foi possível carregar documentos.");
     documentDetails = {
       items: payload.items || [],
@@ -1376,7 +1376,7 @@ async function updateChecklistItem(itemId, done) {
     },
     body: JSON.stringify({ done })
   });
-  const payload = await response.json();
+  const payload = await readJsonResponse(response);
   if (!response.ok) throw new Error(payload.error || "Não foi possível atualizar o checklist.");
   return payload.item;
 }
@@ -1391,7 +1391,7 @@ async function createChecklistItem(payload) {
     },
     body: JSON.stringify(payload)
   });
-  const result = await response.json();
+  const result = await readJsonResponse(response);
   if (!response.ok) throw new Error(result.error || "Não foi possível adicionar o item.");
   return result.item;
 }
@@ -1406,7 +1406,7 @@ async function saveCommunicationBriefing(payload) {
     },
     body: JSON.stringify(payload)
   });
-  const result = await response.json();
+  const result = await readJsonResponse(response);
   if (!response.ok) throw new Error(result.error || "Não foi possível salvar o briefing.");
   return result.communication;
 }
@@ -1421,7 +1421,7 @@ async function generateDocumentAiDraft(payload) {
     },
     body: JSON.stringify(payload)
   });
-  const result = await response.json();
+  const result = await readJsonResponse(response);
   if (!response.ok) throw new Error(result.error || "Não foi possível gerar a minuta.");
   return result.draft;
 }
@@ -1436,7 +1436,7 @@ async function createEventDocument(payload) {
     },
     body: JSON.stringify(payload)
   });
-  const result = await response.json();
+  const result = await readJsonResponse(response);
   if (!response.ok) throw new Error(result.error || "Não foi possível salvar o documento.");
   return result;
 }
@@ -1711,7 +1711,7 @@ async function loadEvents() {
 
   try {
     const response = await fetch("/api/events");
-    const payload = await response.json();
+    const payload = await readJsonResponse(response);
     if (!response.ok) throw new Error(payload.error || "Não foi possível carregar os eventos.");
     events = payload.events || [];
     renderEvents();
