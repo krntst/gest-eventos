@@ -383,8 +383,7 @@ async function updateChecklistItem(itemId, payload) {
     },
     body: {
       status,
-      completed_at: completedAt,
-      updated_at: new Date().toISOString()
+      completed_at: completedAt
     },
     prefer: "return=representation"
   });
@@ -413,13 +412,13 @@ async function getCommunicationRequest(eventId) {
   }
 
   const rows = await selectRows("communication_requests", {
-    select: "event_id,title,short_description,full_description,registration_link,streaming_link,channels,status,updated_at",
+    select: "event_id,official_title,short_description,full_description,registration_link,streaming_link,channels,status,updated_at",
     event_id: `eq.${eventId}`,
     limit: "1"
   });
   const row = rows[0] || {
     event_id: event.id,
-    title: event.official_name,
+    official_title: event.official_name,
     short_description: event.short_description,
     full_description: event.full_description,
     registration_link: null,
@@ -459,7 +458,7 @@ async function saveCommunicationRequest(eventId, payload) {
     },
     body: [{
       event_id: eventId,
-      title: officialTitle,
+      official_title: officialTitle,
       short_description: shortDescription,
       full_description: payload.fullDescription || null,
       registration_link: payload.registrationLink || null,
@@ -504,7 +503,7 @@ async function getEventDocuments(eventId) {
   });
   const usersById = await getUsersByIds(splitIds(items, "owner_user_id"));
   const templates = await selectRows("document_templates", {
-    select: "id,name,category,document_type,body_template",
+    select: "id,name,template_type,body",
     order: "name.asc"
   });
   const usageRows = await selectRows("event_template_usage", {
@@ -597,7 +596,7 @@ async function getEventContextForAi(eventId) {
 
   const usersById = await getUsersByIds([event.lead_user_id]);
   const communicationRows = await selectRows("communication_requests", {
-    select: "title,short_description,full_description,registration_link,streaming_link,channels",
+    select: "official_title,short_description,full_description,registration_link,streaming_link,channels",
     event_id: `eq.${eventId}`,
     limit: "1"
   });
@@ -606,7 +605,7 @@ async function getEventContextForAi(eventId) {
   return {
     ...event,
     responsavel: usersById.get(event.lead_user_id)?.name || "Responsável não informado",
-    communication_title: communication.title,
+    communication_title: communication.official_title,
     communication_short_description: communication.short_description,
     communication_full_description: communication.full_description,
     registration_link: communication.registration_link,
