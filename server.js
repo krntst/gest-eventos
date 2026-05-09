@@ -175,7 +175,9 @@ function eventToClient(row) {
     pendingCount: `${row.pending_count || 0} pendências`,
     criticalArea: row.critical_area || "A definir",
     criticalDeadline: row.critical_deadline || "A definir",
-    communicationStatus: row.communication_status || "Não solicitado"
+    communicationStatus: row.communication_status || "Não solicitado",
+    noOwnerCount: Number(row.no_owner_count || 0),
+    documentsReviewCount: Number(row.documents_review_count || 0)
   };
 }
 
@@ -339,6 +341,19 @@ function listEvents() {
             ci.id
           LIMIT 1
         ) AS critical_deadline,
+        (
+          SELECT COUNT(*)
+          FROM checklist_items ci
+          WHERE ci.event_id = e.id
+            AND ci.status IN ('nao_iniciado', 'em_andamento', 'pendente', 'atrasado')
+            AND ci.owner_user_id IS NULL
+        ) AS no_owner_count,
+        (
+          SELECT COUNT(*)
+          FROM event_documents ed
+          WHERE ed.event_id = e.id
+            AND ed.status IN ('em_revisao', 'aguardando_aprovacao', 'minuta_gerada')
+        ) AS documents_review_count,
         cr.status AS communication_status
       FROM events e
       JOIN users u ON u.id = e.lead_user_id

@@ -102,7 +102,9 @@ function eventToClient(row, helpers = {}) {
     pendingCount: `${pendingCount} pendências`,
     criticalArea: critical?.area || critical?.category || "A definir",
     criticalDeadline: critical?.due_date ? `${critical.due_date} - ${critical.title}` : "A definir",
-    communicationStatus: communication?.status || "Não solicitado"
+    communicationStatus: communication?.status || "Não solicitado",
+    noOwnerCount: helpers.noOwnerCountByEventId?.get(row.id) || 0,
+    documentsReviewCount: helpers.documentsReviewCountByEventId?.get(row.id) || 0
   };
 }
 
@@ -201,27 +203,45 @@ async function listEvents() {
     : [];
   const checklistRows = eventIds.length
     ? await selectRows("checklist_items", {
-      select: "id,event_id,title,area,status,due_date",
+      select: "id,event_id,title,area,status,due_date,owner_user_id",
       event_id: `in.(${eventIds.join(",")})`,
       status: "in.(nao_iniciado,em_andamento,pendente,atrasado)",
       order: "due_date.asc,id.asc"
+    })
+    : [];
+  const documentRows = eventIds.length
+    ? await selectRows("event_documents", {
+      select: "id,event_id,status",
+      event_id: `in.(${eventIds.join(",")})`,
+      status: "in.(em_revisao,aguardando_aprovacao,minuta_gerada)"
     })
     : [];
 
   const communicationByEventId = new Map(communicationRows.map((row) => [row.event_id, row]));
   const pendingCountByEventId = new Map();
   const criticalByEventId = new Map();
+  const noOwnerCountByEventId = new Map();
+  const documentsReviewCountByEventId = new Map();
 
   checklistRows.forEach((item) => {
     pendingCountByEventId.set(item.event_id, (pendingCountByEventId.get(item.event_id) || 0) + 1);
+    if (!item.owner_user_id) {
+      noOwnerCountByEventId.set(item.event_id, (noOwnerCountByEventId.get(item.event_id) || 0) + 1);
+    }
     if (!criticalByEventId.has(item.event_id)) criticalByEventId.set(item.event_id, item);
+  });
+
+  documentRows.forEach((item) => {
+    documentsReviewCountByEventId.set(item.event_id, (documentsReviewCountByEventId.get(item.event_id) || 0) + 1);
   });
 
   return events.map((event) => eventToClient(event, {
     usersById,
     communicationByEventId,
     pendingCountByEventId,
-    criticalByEventId
+    criticalByEventId,
+    noOwnerCountByEventId,
+    documentsReviewCountByEventId
   }));
 }
 

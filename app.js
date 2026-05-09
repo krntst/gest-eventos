@@ -71,7 +71,8 @@ const statusStyles = {
   "Em dia": "bg-emerald-50 text-emerald-700 border-emerald-200",
   "Atrasado": "bg-red-50 text-red-700 border-red-200",
   "Atenção": "bg-amber-50 text-amber-700 border-amber-200",
-  "Em planejamento": "bg-blue-50 text-blue-700 border-blue-200"
+  "Em planejamento": "bg-blue-50 text-blue-700 border-blue-200",
+  "Encerrado": "bg-emerald-50 text-emerald-700 border-emerald-200"
 };
 
 const modal = document.querySelector("#eventModal");
@@ -85,13 +86,23 @@ const eventDocumentForm = document.querySelector("#eventDocumentForm");
 const documentAiModal = document.querySelector("#documentAiModal");
 const documentAiForm = document.querySelector("#documentAiForm");
 const documentAiResult = document.querySelector("#documentAiResult");
-const totalEvents = document.querySelector("#totalEvents");
+const dashboardStats = document.querySelector("#dashboardStats");
 const eventsGrid = document.querySelector("#eventsGrid");
 const localModeWarning = document.querySelector("#localModeWarning");
 const pageTitle = document.querySelector("#pageTitle");
 const filtersBar = document.querySelector("#filtersBar");
 const dashboardView = document.querySelector("#dashboardView");
 const eventDetailView = document.querySelector("#eventDetailView");
+const sidebarToggle = document.querySelector("#sidebarToggle");
+const dashboardSearchInput = filtersBar?.querySelector('input[type="text"], input[type="search"]');
+const dashboardFilterSelects = filtersBar ? Array.from(filtersBar.querySelectorAll("select")) : [];
+
+const dashboardFilters = {
+  query: "",
+  status: "",
+  date: "",
+  area: ""
+};
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -100,6 +111,20 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function normalizeForSearch(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function truncateText(value, maxLength) {
+  const text = String(value || "").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
 function formatDateRange(event) {
@@ -187,6 +212,115 @@ function getCommunicationTone(value) {
   return "warning";
 }
 
+function getEventStatusTone(event) {
+  const status = normalizeForSearch(event.status);
+  if (status.includes("atrasado")) return "danger";
+  if (status.includes("atencao")) return "warning";
+  if (status.includes("encerrado") || status.includes("concluido")) return "success";
+  return "info";
+}
+
+function isEventActive(event) {
+  const status = normalizeForSearch(event.status);
+  return !status.includes("encerrado") && !status.includes("concluido") && !status.includes("cancelado") && !status.includes("arquivado");
+}
+
+function getCriticalDeadlineDate(event) {
+  const value = String(event.criticalDeadline || "");
+  const [date] = value.split(" - ");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isWithinNextDays(date, days) {
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const limit = new Date(today);
+  limit.setDate(today.getDate() + days);
+  return date >= today && date <= limit;
+}
+
+function isSameMonth(value) {
+  if (!value) return false;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth();
+}
+
+function matchesDateFilter(event, filter) {
+  if (!filter) return true;
+  const startDate = event.startDate ? new Date(`${event.startDate}T00:00:00`) : null;
+  if (!startDate || Number.isNaN(startDate.getTime())) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekLimit = new Date(today);
+  weekLimit.setDate(today.getDate() + 7);
+
+  if (filter === "hoje") return startDate.getTime() === today.getTime();
+  if (filter === "semana") return startDate >= today && startDate <= weekLimit;
+  if (filter === "mes") return isSameMonth(event.startDate);
+  return true;
+}
+
+function getFilteredEvents() {
+  const query = normalizeForSearch(dashboardFilters.query);
+
+  return events.filter((event) => {
+    const haystack = normalizeForSearch([
+      event.eventName,
+      event.eventType,
+      event.responsibleArea,
+      event.mainResponsible,
+      event.locations?.join(" "),
+      event.eventDescription
+    ].join(" "));
+    const status = normalizeForSearch(event.status);
+    const area = normalizeForSearch(event.responsibleArea);
+
+    return (!query || haystack.includes(query))
+      && (!dashboardFilters.status || status.includes(dashboardFilters.status))
+      && (!dashboardFilters.area || area.includes(dashboardFilters.area))
+      && matchesDateFilter(event, dashboardFilters.date);
+  });
+}
+
+function getDashboardStats() {
+  const activeEvents = events.filter(isEventActive).length;
+  const criticalDeadlines = events.filter((event) => isWithinNextDays(getCriticalDeadlineDate(event), 7)).length;
+  const noOwnerItems = events.reduce((total, event) => total + Number(event.noOwnerCount || 0), 0);
+  const pendingBriefings = events.filter((event) => {
+    const status = normalizeForSearch(event.communicationStatus);
+    return status && !status.includes("nao_solicitado") && !status.includes("aprovado") && !status.includes("publicado");
+  }).length;
+  const documentsInReview = events.reduce((total, event) => total + Number(event.documentsReviewCount || 0), 0);
+
+  return [
+    ["Eventos ativos", activeEvents, "planejamento e execução", "text-primary"],
+    ["Prazos críticos (7 dias)", criticalDeadlines, "ações com vencimento próximo", criticalDeadlines ? "text-status-warning" : "text-primary"],
+    ["Pendências sem responsável", noOwnerItems, "itens que precisam de dono", noOwnerItems ? "text-status-danger" : "text-primary"],
+    ["Briefings de comunicação", pendingBriefings, "aguardando informações", pendingBriefings ? "text-status-warning" : "text-primary"],
+    ["Documentos em revisão", documentsInReview, "minutas e aprovações", documentsInReview ? "text-status-info" : "text-primary"]
+  ];
+}
+
+function renderDashboardStats() {
+  if (!dashboardStats) return;
+
+  dashboardStats.innerHTML = getDashboardStats()
+    .map(([label, value, detail, toneClass]) => `
+      <div class="rounded-lg border border-outline-variant bg-white p-4 shadow-sm" aria-label="${escapeHtml(label)}: ${escapeHtml(value)}">
+        <p class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">${escapeHtml(label)}</p>
+        <p class="mt-2 text-2xl font-bold ${toneClass}">${escapeHtml(value)}</p>
+        <p class="mt-1 text-xs text-on-surface-variant">${escapeHtml(detail)}</p>
+      </div>
+    `)
+    .join("");
+}
+
 function createEventCard(event) {
   const style = statusStyles[event.status] || statusStyles["Em planejamento"];
   const locationText = event.locations?.length ? event.locations.join(", ") : "Local a definir";
@@ -194,33 +328,47 @@ function createEventCard(event) {
   const criticalArea = formatCriticalArea(event.criticalArea);
   const criticalDeadline = formatCriticalDeadline(event.criticalDeadline);
   const communicationStatus = formatCommunicationStatus(event.communicationStatus);
+  const communicationTone = getCommunicationTone(event.communicationStatus);
+  const displayTitle = truncateText(event.eventName, 78);
+  const displayDescription = truncateText(event.eventDescription || "Sem descrição curta.", 190);
+  const displayLocation = truncateText(locationText, 74);
+  const displayResponsible = truncateText(event.mainResponsible, 40);
+  const displayDeadline = truncateText(criticalDeadline, 54);
+  const displayCommunicationStatus = truncateText(communicationStatus, 40);
+  const pendingTone = getPendingNumber(event) > 0 ? "text-status-warning" : "text-status-success";
+  const deadlineTone = criticalDeadline === "A definir" ? "text-on-surface" : "text-status-danger";
+  const communicationToneClass = {
+    success: "text-status-success",
+    warning: "text-status-warning",
+    neutral: "text-on-surface-variant"
+  }[communicationTone] || "text-on-surface";
 
   return `
-    <article class="flex flex-col overflow-hidden rounded-lg border border-outline-variant bg-white shadow-sm">
+    <article class="flex min-h-[560px] flex-col overflow-hidden rounded-lg border border-outline-variant bg-white shadow-sm">
       <div class="border-b border-outline-variant bg-surface-container-low px-4 py-3">
         <span class="inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${style}">
           ${escapeHtml(event.status)}
         </span>
       </div>
       <div class="flex flex-1 flex-col p-4">
-        <h3 class="mb-2 text-xl font-bold leading-tight">${escapeHtml(event.eventName)}</h3>
+        <h3 class="mb-2 min-h-[56px] text-xl font-bold leading-tight" title="${escapeHtml(event.eventName)}">${escapeHtml(displayTitle)}</h3>
         <div class="mb-3 flex flex-wrap gap-1.5">
-          <span class="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800">${escapeHtml(event.eventType)}</span>
-          <span class="rounded bg-surface-container px-2 py-0.5 text-[11px] font-medium text-on-surface-variant">${escapeHtml(event.format)}</span>
-          <span class="rounded bg-surface-container px-2 py-0.5 text-[11px] font-medium text-on-surface-variant">${escapeHtml(event.responsibleArea)}</span>
+          <span class="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800">${escapeHtml(truncateText(event.eventType, 18))}</span>
+          <span class="rounded bg-surface-container px-2 py-0.5 text-[11px] font-medium text-on-surface-variant">${escapeHtml(truncateText(event.format, 18))}</span>
+          <span class="rounded bg-surface-container px-2 py-0.5 text-[11px] font-medium text-on-surface-variant" title="${escapeHtml(event.responsibleArea)}">${escapeHtml(truncateText(event.responsibleArea, 34))}</span>
         </div>
         <div class="mb-3 space-y-1.5 text-xs text-on-surface-variant">
           <p class="flex items-center gap-2"><span class="material-symbols-outlined text-base">calendar_today</span>${formatDateRange(event)}</p>
           <p class="flex items-center gap-2"><span class="material-symbols-outlined text-base">schedule</span>${escapeHtml(timeText)}</p>
-          <p class="flex items-center gap-2"><span class="material-symbols-outlined text-base">location_on</span>${escapeHtml(locationText)}</p>
-          <p class="flex items-center gap-2"><span class="material-symbols-outlined text-base">person</span>Resp: ${escapeHtml(event.mainResponsible)}</p>
+          <p class="flex items-center gap-2" title="${escapeHtml(locationText)}"><span class="material-symbols-outlined text-base">location_on</span>${escapeHtml(displayLocation)}</p>
+          <p class="flex items-center gap-2" title="${escapeHtml(event.mainResponsible)}"><span class="material-symbols-outlined text-base">person</span>Resp: ${escapeHtml(displayResponsible)}</p>
         </div>
-        <p class="mb-4 line-clamp-3 text-xs text-on-surface-variant">${escapeHtml(event.eventDescription || "Sem descrição curta.")}</p>
+        <p class="mb-4 min-h-[64px] text-xs leading-5 text-on-surface-variant" title="${escapeHtml(event.eventDescription || "Sem descrição curta.")}">${escapeHtml(displayDescription)}</p>
         <div class="mt-auto space-y-1.5 border-t border-outline-variant pt-3 text-xs">
-          <p class="flex justify-between gap-4"><span class="text-on-surface-variant">Total de pendências</span><span class="font-medium">${escapeHtml(event.pendingCount)}</span></p>
-          <p class="flex justify-between gap-4"><span class="text-on-surface-variant">Área mais crítica</span><span class="font-medium">${escapeHtml(criticalArea)}</span></p>
-          <p class="flex justify-between gap-4"><span class="text-on-surface-variant">Próximo prazo crítico</span><span class="font-medium">${escapeHtml(criticalDeadline)}</span></p>
-          <p class="flex justify-between gap-4"><span class="text-on-surface-variant">Status da comunicação</span><span class="font-medium">${escapeHtml(communicationStatus)}</span></p>
+          <p class="grid grid-cols-[minmax(0,1fr)_minmax(120px,auto)] gap-4"><span class="text-on-surface-variant">Total de pendências</span><span class="text-right font-medium ${pendingTone}">${escapeHtml(event.pendingCount)}</span></p>
+          <p class="grid grid-cols-[minmax(0,1fr)_minmax(120px,auto)] gap-4"><span class="text-on-surface-variant">Área mais crítica</span><span class="text-right font-medium">${escapeHtml(truncateText(criticalArea, 28))}</span></p>
+          <p class="grid grid-cols-[minmax(0,1fr)_minmax(150px,auto)] gap-4"><span class="text-on-surface-variant">Próximo prazo crítico</span><span class="text-right font-medium ${deadlineTone}" title="${escapeHtml(criticalDeadline)}">${escapeHtml(displayDeadline)}</span></p>
+          <p class="grid grid-cols-[minmax(0,1fr)_minmax(140px,auto)] gap-4"><span class="text-on-surface-variant">Status da comunicação</span><span class="text-right font-medium ${communicationToneClass}" title="${escapeHtml(communicationStatus)}">${escapeHtml(displayCommunicationStatus)}</span></p>
         </div>
       </div>
       <div class="flex justify-end gap-2 border-t border-outline-variant bg-surface-container-low p-3">
@@ -233,10 +381,15 @@ function createEventCard(event) {
 }
 
 function renderEvents() {
-  eventsGrid.innerHTML = events.length
-    ? events.map(createEventCard).join("")
-    : '<p class="col-span-full border border-outline-variant bg-white p-6 text-sm text-on-surface-variant">Nenhum evento cadastrado.</p>';
-  totalEvents.textContent = String(events.length);
+  renderDashboardStats();
+  const filteredEvents = getFilteredEvents();
+  const hasActiveFilter = dashboardFilters.query || dashboardFilters.status || dashboardFilters.date || dashboardFilters.area;
+
+  eventsGrid.innerHTML = filteredEvents.length
+    ? filteredEvents.map(createEventCard).join("")
+    : `<p class="col-span-full border border-outline-variant bg-white p-6 text-sm text-on-surface-variant">
+        ${hasActiveFilter ? "Nenhum evento encontrado com os filtros atuais." : "Nenhum evento cadastrado."}
+      </p>`;
 }
 
 function showDashboard() {
@@ -1695,6 +1848,38 @@ function saveEvents() {
   localStorage.setItem("fcrb-events", JSON.stringify(events));
 }
 
+function applySidebarState(collapsed) {
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  sidebarToggle?.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  sidebarToggle?.setAttribute("aria-label", collapsed ? "Expandir menu lateral" : "Recolher menu lateral");
+  localStorage.setItem("fcrb-sidebar-collapsed", collapsed ? "1" : "0");
+}
+
+function initSidebar() {
+  const collapsed = localStorage.getItem("fcrb-sidebar-collapsed") === "1";
+  applySidebarState(collapsed);
+
+  sidebarToggle?.addEventListener("click", () => {
+    applySidebarState(!document.body.classList.contains("sidebar-collapsed"));
+  });
+}
+
+function initDashboardFilters() {
+  dashboardSearchInput?.addEventListener("input", (event) => {
+    dashboardFilters.query = event.target.value;
+    renderEvents();
+  });
+
+  dashboardFilterSelects.forEach((select, index) => {
+    select.addEventListener("change", (event) => {
+      if (index === 0) dashboardFilters.status = event.target.value;
+      if (index === 1) dashboardFilters.date = event.target.value;
+      if (index === 2) dashboardFilters.area = event.target.value;
+      renderEvents();
+    });
+  });
+}
+
 async function loadEvents() {
   if (!isServerMode()) {
     events = [];
@@ -1707,7 +1892,16 @@ async function loadEvents() {
     return;
   }
 
-  eventsGrid.innerHTML = '<p class="col-span-full border border-outline-variant bg-white p-6 text-sm text-on-surface-variant">Carregando eventos do banco local...</p>';
+  if (dashboardStats) {
+    dashboardStats.innerHTML = Array.from({ length: 5 }).map(() => `
+      <div class="rounded-lg border border-outline-variant bg-white p-4 shadow-sm">
+        <p class="h-3 w-32 rounded bg-surface-container"></p>
+        <p class="mt-3 h-7 w-10 rounded bg-surface-container"></p>
+        <p class="mt-2 h-3 w-40 rounded bg-surface-container"></p>
+      </div>
+    `).join("");
+  }
+  eventsGrid.innerHTML = '<p class="col-span-full border border-outline-variant bg-white p-6 text-sm text-on-surface-variant">Carregando eventos...</p>';
 
   try {
     const response = await fetch("/api/events");
@@ -1718,6 +1912,11 @@ async function loadEvents() {
   } catch (error) {
     events = loadSavedEvents();
     renderEvents();
+    eventsGrid.insertAdjacentHTML("afterbegin", `
+      <p class="col-span-full border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        Não foi possível carregar os eventos da API. Exibindo dados locais de apoio.
+      </p>
+    `);
     console.warn("Usando dados locais porque a API não respondeu.", error);
   }
 }
@@ -2127,5 +2326,7 @@ documentAiModal?.addEventListener("click", (event) => {
   if (event.target === documentAiModal) closeDocumentAiModal();
 });
 
+initSidebar();
+initDashboardFilters();
 configureRuntimeMode();
 loadEvents();

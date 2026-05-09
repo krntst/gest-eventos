@@ -42,6 +42,25 @@
     .material-symbols-outlined {
       font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
     }
+
+    body.sidebar-collapsed #appSidebar {
+      width: 5rem;
+    }
+
+    body.sidebar-collapsed .sidebar-label,
+    body.sidebar-collapsed .sidebar-profile,
+    body.sidebar-collapsed .sidebar-brand-text {
+      display: none;
+    }
+
+    body.sidebar-collapsed #appSidebar .sidebar-link,
+    body.sidebar-collapsed #appSidebar .sidebar-settings-link {
+      justify-content: center;
+    }
+
+    body.sidebar-collapsed #sidebarToggle .material-symbols-outlined {
+      transform: rotate(180deg);
+    }
   </style>
 </head>
 <body class="h-screen overflow-hidden bg-background font-sans text-on-surface">
@@ -50,55 +69,60 @@
     Use <strong>http://127.0.0.1:4173/</strong>.
   </div>
   <div class="flex h-full">
-    <aside class="flex h-full w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest">
-      <div class="flex h-16 items-center gap-2 border-b border-outline-variant px-6 text-xl font-bold text-primary">
-        <span class="material-symbols-outlined">account_balance</span>
-        FCRB Eventos
+    <aside id="appSidebar" class="flex h-full w-64 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest transition-all duration-200">
+      <div class="flex h-16 items-center justify-between gap-2 border-b border-outline-variant px-4 text-xl font-bold text-primary">
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="material-symbols-outlined">account_balance</span>
+          <span class="sidebar-brand-text truncate">FCRB Eventos</span>
+        </div>
+        <button id="sidebarToggle" class="rounded-md p-1 text-on-surface-variant hover:bg-surface-container-low hover:text-primary" type="button" aria-label="Recolher menu lateral" aria-expanded="true">
+          <span class="material-symbols-outlined text-lg transition-transform">chevron_left</span>
+        </button>
       </div>
 
       <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        <a class="flex items-center gap-3 rounded-md bg-primary-container px-3 py-2 text-sm font-medium text-white" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md bg-primary-container px-3 py-2 text-sm font-medium text-white" href="#">
           <span class="material-symbols-outlined">dashboard</span>
-          Painel
+          <span class="sidebar-label">Painel</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">event</span>
-          Eventos
+          <span class="sidebar-label">Eventos</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">task_alt</span>
-          Tarefas
+          <span class="sidebar-label">Tarefas</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">campaign</span>
-          Comunicação
+          <span class="sidebar-label">Comunicação</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">group</span>
-          Convidados
+          <span class="sidebar-label">Convidados</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">local_shipping</span>
-          Fornecedores
+          <span class="sidebar-label">Fornecedores</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">description</span>
-          Documentos
+          <span class="sidebar-label">Documentos</span>
         </a>
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">history</span>
-          Histórico
+          <span class="sidebar-label">Histórico</span>
         </a>
       </nav>
 
       <div class="border-t border-outline-variant p-4">
-        <a class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
+        <a class="sidebar-settings-link flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low" href="#">
           <span class="material-symbols-outlined">settings</span>
-          Configurações
+          <span class="sidebar-label">Configurações</span>
         </a>
         <div class="mt-4 flex items-center gap-3 px-3">
           <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">AS</div>
-          <div>
+          <div class="sidebar-profile">
             <p class="text-sm font-medium">Ana Silva</p>
             <p class="text-xs text-on-surface-variant">Gestora de Eventos</p>
           </div>
@@ -122,49 +146,30 @@
             <input class="w-full rounded-md border border-outline-variant bg-white py-2 pl-10 pr-4 text-sm" placeholder="Buscar eventos..." type="text" />
           </div>
           <select class="rounded-md border border-outline-variant bg-white py-2 pl-3 pr-8 text-sm">
-            <option>Status</option>
-            <option>Em planejamento</option>
-            <option>Em andamento</option>
-            <option>Encerrado</option>
+            <option value="">Status</option>
+            <option value="em planejamento">Em planejamento</option>
+            <option value="em andamento">Em andamento</option>
+            <option value="encerrado">Encerrado</option>
           </select>
           <select class="rounded-md border border-outline-variant bg-white py-2 pl-3 pr-8 text-sm">
-            <option>Data</option>
-            <option>Hoje</option>
-            <option>Esta semana</option>
-            <option>Este mês</option>
+            <option value="">Data</option>
+            <option value="hoje">Hoje</option>
+            <option value="semana">Esta semana</option>
+            <option value="mes">Este mês</option>
           </select>
           <select class="rounded-md border border-outline-variant bg-white py-2 pl-3 pr-8 text-sm">
-            <option>Área</option>
-            <option>Centro de Pesquisa</option>
-            <option>Diretoria de Difusão Cultural</option>
+            <option value="">Área</option>
+            <option value="centro de pesquisa">Centro de Pesquisa</option>
+            <option value="centro de memoria e informacao">Centro de Memória e Informação</option>
+            <option value="diretoria de difusao cultural">Diretoria de Difusão Cultural</option>
+            <option value="presidencia">Presidência</option>
           </select>
         </div>
       </header>
 
       <div class="flex-1 overflow-y-auto p-6">
         <div id="dashboardView">
-        <section class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
-            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Eventos cadastrados</p>
-            <p id="totalEvents" class="mt-1 text-xl font-bold text-primary">3</p>
-          </div>
-          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
-            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Próximos em andamento</p>
-            <p class="mt-1 text-xl font-bold text-status-info">12</p>
-          </div>
-          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
-            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Pendências em atraso</p>
-            <p class="mt-1 text-xl font-bold text-status-danger">8</p>
-          </div>
-          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
-            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Comunicação pendente</p>
-            <p class="mt-1 text-xl font-bold text-status-warning">5</p>
-          </div>
-          <div class="rounded-lg border border-outline-variant bg-white p-3 shadow-sm">
-            <p class="text-xs font-medium uppercase tracking-wide text-on-surface-variant">Eventos encerrados</p>
-            <p class="mt-1 text-xl font-bold text-status-success">128</p>
-          </div>
-        </section>
+        <section id="dashboardStats" class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5"></section>
 
         <section id="eventsGrid" class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3"></section>
         </div>
