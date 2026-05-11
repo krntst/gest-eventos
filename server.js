@@ -91,6 +91,21 @@ function ensureSchemaMigrations() {
   `);
 
   db.exec("CREATE INDEX IF NOT EXISTS idx_event_documents_event_status ON event_documents(event_id, status)");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY,
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      actor_user_id INTEGER REFERENCES users(id),
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.exec("CREATE INDEX IF NOT EXISTS idx_audit_log_event_created ON audit_log(event_id, created_at DESC)");
 }
 
 ensureSchemaMigrations();
@@ -227,6 +242,30 @@ function eventDocumentToClient(row) {
     sourceDraftId: row.source_draft_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function parseAuditDetails(value) {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function auditLogToClient(row) {
+  return {
+    id: row.id,
+    eventDbId: row.event_id,
+    actorUserId: row.actor_user_id,
+    actorName: row.actor_name || "Sistema",
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    details: parseAuditDetails(row.details),
+    createdAt: row.created_at
   };
 }
 
@@ -475,6 +514,29 @@ function getChecklistItems(eventId) {
     `)
     .all(eventId)
     .map(checklistItemToClient);
+}
+
+function getEventHistory(eventId) {
+  return db
+    .prepare(`
+      SELECT
+        al.id,
+        al.event_id,
+        al.actor_user_id,
+        al.action,
+        al.entity_type,
+        al.entity_id,
+        al.details,
+        al.created_at,
+        u.name AS actor_name
+      FROM audit_log al
+      LEFT JOIN users u ON u.id = al.actor_user_id
+      WHERE al.event_id = ?
+      ORDER BY al.created_at DESC, al.id DESC
+      LIMIT 100
+    `)
+    .all(eventId)
+    .map(auditLogToClient);
 }
 
 function getEventDocuments(eventId) {
@@ -1443,6 +1505,12 @@ const server = http.createServer(async (request, response) => {
       const payload = await readJson(request);
       const event = updateEvent(Number(eventMatch[1]), payload);
       sendJson(response, 200, { event });
+      return;
+    }
+
+    const historyMatch = url.pathname.match(/^\/api\/events\/(\d+)\/history$/);
+    if (request.method === "GET" && historyMatch) {
+      sendJson(response, 200, { items: getEventHistory(Number(historyMatch[1])) });
       return;
     }
 

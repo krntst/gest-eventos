@@ -63,6 +63,8 @@ let communicationDetails = null;
 let communicationLoadedEventId = null;
 let documentDetails = null;
 let documentLoadedEventId = null;
+let historyItems = [];
+let historyLoadedEventId = null;
 let currentDocumentAiDraft = null;
 let currentDocumentAiMode = "preview";
 let editingEvent = null;
@@ -152,6 +154,20 @@ function formatDateValue(value) {
     day: "2-digit",
     month: "short",
     year: "numeric"
+  }).format(date);
+}
+
+function formatDateTimeValue(value) {
+  if (!value) return "Agora";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
   }).format(date);
 }
 
@@ -755,6 +771,119 @@ function renderAiDraftHistory(aiDrafts = []) {
       </div>
     `)
     .join("");
+}
+
+function formatHistoryAction(action) {
+  const labels = {
+    criou_evento: "Evento criado",
+    editou_evento: "Evento editado",
+    criou_item_checklist: "Item de checklist criado",
+    concluiu_item_checklist: "Item concluído",
+    reabriu_item_checklist: "Item reaberto",
+    atualizou_briefing_comunicacao: "Briefing de comunicação atualizado",
+    criou_documento: "Documento criado",
+    gerou_minuta_ia_documentos: "Minuta gerada com IA"
+  };
+
+  return labels[action] || formatStatusLabel(action);
+}
+
+function formatHistoryEntity(entityType) {
+  const labels = {
+    event: "Evento",
+    checklist_item: "Checklist",
+    communication_request: "Comunicação",
+    event_document: "Documento",
+    document_ai_draft: "Minuta IA"
+  };
+
+  return labels[entityType] || formatStatusLabel(entityType);
+}
+
+function formatHistoryDetails(details) {
+  if (!details) return "Sem detalhes adicionais.";
+  if (typeof details === "string") return details;
+
+  const preferredKeys = ["title", "document_title", "draft_type", "provider", "model", "status", "origin", "area"];
+  const keyLabels = {
+    title: "Título",
+    document_title: "Documento",
+    draft_type: "Tipo de minuta",
+    provider: "Provedor",
+    model: "Modelo",
+    status: "Status",
+    origin: "Origem",
+    area: "Área"
+  };
+  const formatHistoryValue = (value) => {
+    if (Array.isArray(value)) return value.join(", ");
+    if (value && typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+  const parts = preferredKeys
+    .filter((key) => details[key])
+    .map((key) => `${keyLabels[key] || formatStatusLabel(key)}: ${formatHistoryValue(details[key])}`);
+
+  if (parts.length) return parts.join(" · ");
+
+  return Object.entries(details)
+    .slice(0, 4)
+    .map(([key, value]) => `${keyLabels[key] || formatStatusLabel(key)}: ${formatHistoryValue(value)}`)
+    .join(" · ") || "Sem detalhes adicionais.";
+}
+
+function renderHistoryItems(items = []) {
+  if (!items.length) {
+    return `
+      <div class="rounded-lg border border-outline-variant bg-white p-8 text-center">
+        <span class="material-symbols-outlined text-3xl text-on-surface-variant">history</span>
+        <p class="mt-3 font-medium text-on-surface">Nenhum registro no histórico</p>
+        <p class="mt-1 text-sm text-on-surface-variant">As próximas ações importantes deste evento aparecerão aqui.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <ol class="space-y-3">
+      ${items.map((item) => `
+        <li class="rounded-lg border border-outline-variant bg-white p-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded bg-primary-fixed px-2 py-1 text-xs font-medium text-on-primary-fixed">${escapeHtml(formatHistoryEntity(item.entityType))}</span>
+                <h4 class="font-semibold text-primary">${escapeHtml(formatHistoryAction(item.action))}</h4>
+              </div>
+              <p class="mt-2 text-sm leading-6 text-on-surface-variant">${escapeHtml(formatHistoryDetails(item.details))}</p>
+              <p class="mt-2 text-xs text-on-surface-variant">
+                Por ${escapeHtml(item.actorName || "Sistema")}
+                ${item.entityId ? ` · Registro #${escapeHtml(item.entityId)}` : ""}
+              </p>
+            </div>
+            <time class="shrink-0 text-sm font-medium text-on-surface-variant">${escapeHtml(formatDateTimeValue(item.createdAt))}</time>
+          </div>
+        </li>
+      `).join("")}
+    </ol>
+  `;
+}
+
+function renderHistoryContent() {
+  return `
+    <section class="rounded-lg border border-outline-variant bg-surface-container-lowest">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant p-4">
+        <div>
+          <h3 class="text-lg font-semibold text-primary">Histórico do evento</h3>
+          <p class="text-sm text-on-surface-variant">Memória institucional das principais ações registradas na ficha.</p>
+        </div>
+        <span class="rounded bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
+          ${historyItems.length} registro${historyItems.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div class="p-4">
+        ${renderHistoryItems(historyItems)}
+      </div>
+    </section>
+  `;
 }
 
 function formatDraftType(value) {
@@ -1521,6 +1650,32 @@ async function loadDocumentDetails(event) {
   }
 }
 
+async function loadEventHistory(event) {
+  if (!event?.dbId || !isServerMode()) {
+    historyItems = [];
+    renderEventDetail(event, "history");
+    return;
+  }
+
+  const target = document.querySelector("#detailTabContent");
+  if (target) {
+    target.innerHTML = '<p class="rounded-lg border border-outline-variant bg-white p-6 text-sm text-on-surface-variant">Carregando histórico...</p>';
+  }
+
+  try {
+    const response = await fetch(`/api/events/${event.dbId}/history`);
+    const payload = await readJsonResponse(response);
+    if (!response.ok) throw new Error(payload.error || "Não foi possível carregar o histórico.");
+    historyItems = payload.items || [];
+    historyLoadedEventId = event.id;
+    renderEventDetail(event, "history");
+  } catch (error) {
+    if (target) {
+      target.innerHTML = `<p class="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">${escapeHtml(error.message)}</p>`;
+    }
+  }
+}
+
 async function updateChecklistItem(itemId, done) {
   const response = await fetch(`/api/checklist-items/${itemId}`, {
     method: "PATCH",
@@ -1608,7 +1763,9 @@ function renderEventDetail(event, activeTab = "overview") {
       ? renderCommunicationContent(event)
       : activeTab === "documents"
         ? renderDocumentsContent(event)
-        : renderOverviewContent(event);
+        : activeTab === "history"
+          ? renderHistoryContent(event)
+          : renderOverviewContent(event);
 
   pageTitle.textContent = "Ficha do Evento";
   filtersBar.classList.add("hidden");
@@ -1671,6 +1828,10 @@ function renderEventDetail(event, activeTab = "overview") {
 
   if (activeTab === "communication" && communicationLoadedEventId !== event.id) {
     loadCommunicationDetails(event);
+  }
+
+  if (activeTab === "history" && historyLoadedEventId !== event.id) {
+    loadEventHistory(event);
   }
 }
 
@@ -1982,6 +2143,10 @@ async function handleSubmit(event) {
 
       if (editingEvent) {
         events = events.map((event) => event.id === editingEvent.id ? payload.event : event);
+        if (activeEvent?.id === editingEvent.id) {
+          activeEvent = payload.event;
+          historyLoadedEventId = null;
+        }
       } else {
         events.unshift(payload.event);
       }
@@ -2034,6 +2199,7 @@ checklistItemForm.addEventListener("submit", async (event) => {
     checklistItems.unshift(item);
     checklistLoadedEventId = activeEvent.id;
     documentLoadedEventId = null;
+    historyLoadedEventId = null;
     const returnTab = checklistReturnTab;
     closeChecklistItemModal();
     renderEventDetail(activeEvent, returnTab);
@@ -2064,6 +2230,7 @@ communicationBriefingForm.addEventListener("submit", async (event) => {
       channels: getBriefingChannels()
     });
     communicationLoadedEventId = activeEvent.id;
+    historyLoadedEventId = null;
     closeCommunicationBriefingModal();
     renderEventDetail(activeEvent, "communication");
     await loadEvents();
@@ -2106,6 +2273,7 @@ eventDocumentForm?.addEventListener("submit", async (event) => {
       aiDrafts: documentDetails?.aiDrafts || []
     };
     documentLoadedEventId = activeEvent.id;
+    historyLoadedEventId = null;
     if (result.checklistItem) {
       checklistItems = [result.checklistItem, ...checklistItems];
       checklistLoadedEventId = null;
@@ -2171,6 +2339,7 @@ documentAiForm?.addEventListener("submit", async (event) => {
       ].slice(0, 5)
     };
     documentLoadedEventId = activeEvent.id;
+    historyLoadedEventId = null;
     renderEventDetail(activeEvent, "documents");
   } catch (error) {
     documentAiResult.innerHTML = `<p class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">${escapeHtml(error.message)}</p>`;
@@ -2259,6 +2428,8 @@ eventsGrid.addEventListener("click", (event) => {
     communicationLoadedEventId = null;
     documentDetails = null;
     documentLoadedEventId = null;
+    historyItems = [];
+    historyLoadedEventId = null;
     renderEventDetail(selectedEvent, detailButton.classList.contains("js-open-pendencias") ? "checklist" : "overview");
   }
 });
@@ -2297,6 +2468,7 @@ eventDetailView.addEventListener("click", async (event) => {
     try {
       const updatedItem = await updateChecklistItem(itemId, done);
       checklistItems = checklistItems.map((item) => item.id === itemId ? updatedItem : item);
+      historyLoadedEventId = null;
       renderEventDetail(activeEvent, "checklist");
     } catch (error) {
       alert(error.message);

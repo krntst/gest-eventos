@@ -188,6 +188,32 @@ function aiDraftToClient(row) {
   };
 }
 
+function parseAuditDetails(value) {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function auditLogToClient(row, usersById = new Map()) {
+  const actor = usersById.get(row.actor_user_id);
+
+  return {
+    id: row.id,
+    eventDbId: row.event_id,
+    actorUserId: row.actor_user_id,
+    actorName: actor?.name || "Sistema",
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    details: parseAuditDetails(row.details),
+    createdAt: row.created_at
+  };
+}
+
 async function listEvents() {
   const events = await selectRows("events", {
     select: "id,official_name,event_type,event_date,start_time,end_time,location,format,responsible_area,lead_user_id,short_description,status",
@@ -352,6 +378,18 @@ async function getChecklistItems(eventId) {
   });
   const usersById = await getUsersByIds(splitIds(items, "owner_user_id"));
   return items.map((item) => checklistItemToClient(item, usersById));
+}
+
+async function getEventHistory(eventId) {
+  const items = await selectRows("audit_log", {
+    select: "id,event_id,actor_user_id,action,entity_type,entity_id,details,created_at",
+    event_id: `eq.${eventId}`,
+    order: "created_at.desc,id.desc",
+    limit: "100"
+  });
+  const usersById = await getUsersByIds(splitIds(items, "actor_user_id"));
+
+  return items.map((item) => auditLogToClient(item, usersById));
 }
 
 async function createChecklistItem(eventId, payload) {
@@ -875,6 +913,12 @@ module.exports = async function handler(request, response) {
       const payload = await readJson(request);
       const event = await updateEvent(Number(eventMatch[1]), payload);
       sendJson(response, 200, { event });
+      return;
+    }
+
+    const historyMatch = pathname.match(/^\/api\/events\/(\d+)\/history$/);
+    if (request.method === "GET" && historyMatch) {
+      sendJson(response, 200, { items: await getEventHistory(Number(historyMatch[1])) });
       return;
     }
 
